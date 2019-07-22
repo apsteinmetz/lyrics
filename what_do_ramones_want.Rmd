@@ -1,0 +1,41 @@
+---
+title: "What Do the Ramones Want?"
+output: html_notebook
+---
+
+```{r}
+#devtools::install_github("dmi3kno/polite")
+library(tidyverse)
+library(tidytext)
+library(rvest)
+library(polite)
+```
+
+Get names of all Ramones songs from azlyrics.com.  Use the `polite` package so we obey the robots.txt instructions at the site.
+```{r}
+# be polite. get scraping parameters.
+base_url <- "https://azlyrics.com"
+ song_list_raw <- polite::bow("https://azlyrics.com/r/ramones.html") %>% 
+   polite::scrape() %>%
+   rvest::html_nodes("#listAlbum a")
+
+song_list <- song_list_raw %>% 
+  rvest::html_attr("href") %>% 
+  tibble::enframe(name = NULL,value = "lyric_url") %>% 
+  dplyr::mutate(song_name = html_text(song_list_raw)) %>% 
+  mutate(lyric_url=str_replace(lyric_url,"..",base_url))
+```
+
+Now get all the lyrics
+```{r}
+#make a function to get lyrics
+
+get_lyric <- function(lyric_url){
+  lyric <- bow(lyric_url) %>% 
+    scrape() %>% 
+    html_node(".noprint , div") %>% 
+    html_text()
+  return(lyric)
+}
+```
+
