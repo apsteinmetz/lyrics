@@ -33,9 +33,24 @@ Now get all the lyrics
 get_lyric <- function(lyric_url){
   lyric <- bow(lyric_url) %>% 
     scrape() %>% 
-    html_node(".noprint , div") %>% 
-    html_text()
+    #    /html/body/div[4]/div/div[2]/div[5]
+    # body > div.container.main-page > div > div.col-xs-12.col-lg-8.text-center > div:nth-child(8)
+    html_nodes("div") %>%
+    #not happy with this.  relies on the lyrics always being the 22nd `<div>` tag on the page.
+    .[22] %>% 
+    html_text() %>%
+    str_remove_all("\r") %>% 
+    str_replace_all("\n"," ") %>% 
+    str_trim()
   return(lyric)
+}
+
+all_lyrics <- NULL
+for (lyric_url in song_list$lyric_url){
+  get_lyric(lyric_url)
+  print(lyric)
+  all_lyrics <- c(all_lyrics,lyric)
+  
 }
 ```
 
