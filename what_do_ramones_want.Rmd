@@ -46,11 +46,13 @@ get_lyric <- function(lyric_url){
 }
 
 all_lyrics <- NULL
-for (lyric_url in song_list$lyric_url){
-  get_lyric(lyric_url)
+all_urls <- song_list$lyric_url
+for (lyric_url in all_urls[6:185]){
+  lyric <- get_lyric(lyric_url)
   print(lyric)
   all_lyrics <- c(all_lyrics,lyric)
   
 }
+save(all_lyrics,file="data/all_ramones_lyrics.rdata")
 ```
 
