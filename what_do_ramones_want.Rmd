@@ -13,6 +13,9 @@ library(polite)
 
 Get names of all Ramones songs from azlyrics.com.  Use the `polite` package so we obey the robots.txt instructions at the site.
 ```{r}
+if (file.exists("data/ramones_song_list.rdata")){
+  load("data/ramones_song_list.rdata")
+} else {
 # be polite. get scraping parameters.
 base_url <- "https://azlyrics.com"
  song_list_raw <- polite::bow("https://azlyrics.com/r/ramones.html") %>% 
@@ -24,9 +27,13 @@ song_list <- song_list_raw %>%
   tibble::enframe(name = NULL,value = "lyric_url") %>% 
   dplyr::mutate(song_name = html_text(song_list_raw)) %>% 
   mutate(lyric_url=str_replace(lyric_url,"..",base_url))
+save(song_list,file="data/ramones_song_list.rdata")
+}
+
+song_list
 ```
 
-Now get all the lyrics
+Now get all the lyrics.
 ```{r}
 #make a function to get lyrics
 
@@ -45,14 +52,64 @@ get_lyric <- function(lyric_url){
   return(lyric)
 }
 
-all_lyrics <- NULL
-all_urls <- song_list$lyric_url
-for (lyric_url in all_urls[6:185]){
-  lyric <- get_lyric(lyric_url)
-  print(lyric)
-  all_lyrics <- c(all_lyrics,lyric)
-  
+if (file.exists("data/raw_ramones_lyrics.rdata")){
+  load("data/all_ramones_lyrics.rdata")
+} else {
+  all_lyrics <- NULL
+  all_urls <- song_list$lyric_url
+  for (lyric_url in all_urls){
+    lyric <- get_lyric(lyric_url)
+    all_lyrics <- c(all_lyrics,lyric)
+    
+  }
+  save(all_lyrics,file="data/raw_ramones_lyrics.rdata")
 }
-save(all_lyrics,file="data/all_ramones_lyrics.rdata")
+
+print(all_lyrics[1])
+```
+
+Make into a complete data frame with all the trimmings
+```{r}
+ramones_lyrics <- song_list %>%  
+  bind_cols(enframe(all_lyrics,name="corpus_order",value="lyrics")) %>% 
+  mutate(band="Ramones") %>% 
+  select(band,song_name,lyrics,lyric_url)
+
+ramones_lyrics
+```
+
+```{r}
+lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(word,lyrics)
+
+```
+
+```{r}
+lyric_words_cleaned <- lyric_words %>% anti_join(get_stopwords())
+
+#quick sentiment analysis
+positive <- get_sentiments("bing") %>%
+  filter(sentiment == "positive")
+
+negative <- get_sentiments("bing") %>%
+  filter(sentiment == "negative")
+
+lyric_words_cleaned %>%
+  semi_join(positive,by="word") %>%
+  group_by(song_name) %>% 
+  count(word) %>% 
+  group_by(song_name) %>% 
+  tally(sort = TRUE,name="Happy Words")
+  
+```
+
+```{r}
+lyric_words_cleaned %>%
+  semi_join(negative,by="word") %>%
+  group_by(song_name) %>% 
+  count(word) %>% 
+  group_by(song_name) %>% 
+  tally(sort = TRUE,name="Sad Words")
+  
+
 ```
 
