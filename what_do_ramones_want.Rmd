@@ -56,7 +56,7 @@ get_lyric <- function(lyric_url){
 }
 
 if (file.exists("data/raw_ramones_lyrics.rdata")){
-  load("data/all_ramones_lyrics.rdata")
+  load("data/raw_ramones_lyrics.rdata")
 } else {
   all_lyrics <- NULL
   all_urls <- song_list$lyric_url
@@ -157,5 +157,132 @@ lyric_words_cleaned %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
   comparison.cloud(colors = c("#F8766D", "#00BFC4"),
                    max.words = 100)
+```
+
+Now lets find what the Ramones Want.  Let's look at the most common igrams, which would include the phrases like "I want" and "I wanna."
+
+Start with shortest n-gram that is a complete thought and work up to longer phrases.  We take the the shortest phrase that makes sense unless appending more words doesn't change the frequency.  Then we take the longer phrase.  For instance if "I wanna steal some money" and "I wanna steal from the rich" both exist we take "I wanna steal" since it would have a higher frequency.  In this case, the only phrase starting with "I wanna steal"  is "I wanna steal from the rich" so we use that.
+```{r}
+want_phrases <- "^(i wanna|i want|we want|we wanna|i wanted)"
+
+get_ngrams <- function(lyric_df,n){
+  lyric_ngram <- ramones_lyrics %>% 
+    select(-band,-lyric_url) %>% 
+    unnest_tokens(ngram,lyrics,token = "ngrams",n=n) %>% 
+    group_by(ngram) %>% 
+    filter(str_detect(ngram,want_phrases)) %>% 
+    count() %>% 
+    arrange(desc(n)) %>% 
+    filter(n>1) %>% mutate(want=str_remove(ngram,want_phrases)) %>% 
+    rownames_to_column()
+  return(lyric_ngram)
+  
+}
+
+want <- ramones_lyrics %>% get_ngrams(3)
+want
+```
+
+What a human needs to do is decide which phrases are complete thoughts.  We manually select the row numbers to build our ultimate table and build a longer n-gram table to flesh out those that are not.
+
+```{r}
+ultimate_want <- tibble()
+ultimate_want <- bind_rows(ultimate_want,want[c(2,4,8,9,11),])
+want <- ramones_lyrics %>% get_ngrams(4)
+want
+```
+
+
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(1,3,22,23),])
+want <- ramones_lyrics %>% get_ngrams(5)
+want
+
+```
+
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(6,13,18),])
+want <- ramones_lyrics %>% get_ngrams(6)
+want
+
+```
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(8,13),])
+want <- ramones_lyrics %>% get_ngrams(7)
+wantultimate_want <- bind_rows(ultimate_want,want[c(4),])
+
+```
+
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(4),])
+ultimate_want <- ultimate_want %>% arrange(desc(n)) %>% select(-rowname)
+ultimate_want
+```
+Now strip "to" so that everthing sounds like it comes after "wanna" instead of "want" and do some other clean up.
+```{r}
+ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"to |ed |wanna ")) %>% 
+  group_by(want) %>%
+  summarise(n=sum(n))
+ultimate_want
+```
+
+```{r}
+ultimate_want %>% mutate(want=reorder(want,n)) %>% 
+  ggplot(aes(want,n)) + geom_col()+coord_flip()
+```
+What DON'T the Ramones want
+```{r}
+want_phrases <- "^(i don't wanna|i don't want|we don't want|we don't wanna|i didn't want)"
+
+want <- ramones_lyrics %>% get_ngrams(4)
+want
+```
+
+What a human needs to do is decide which phrases are complete thoughts.  We manually select the row numbers to build our ultimate table and build a longer n-gram table to flesh out those that are not.
+
+```{r}
+ultimate_want <- tibble()
+ultimate_want <- bind_rows(ultimate_want,want[c(2,4,8,9,11),])
+want <- ramones_lyrics %>% get_ngrams(4)
+want
+```
+
+
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(1,3,22,23),])
+want <- ramones_lyrics %>% get_ngrams(5)
+want
+
+```
+
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(6,13,18),])
+want <- ramones_lyrics %>% get_ngrams(6)
+want
+
+```
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(8,13),])
+want <- ramones_lyrics %>% get_ngrams(7)
+wantultimate_want <- bind_rows(ultimate_want,want[c(4),])
+
+```
+
+```{r}
+ultimate_want <- bind_rows(ultimate_want,want[c(4),])
+ultimate_want <- ultimate_want %>% arrange(desc(n)) %>% select(-rowname)
+ultimate_want
+```
+Now strip "to" so that everthing sounds like it comes after "wanna" instead of "want" and do some other clean up.
+```{r}
+ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"to |ed |wanna ")) %>% 
+  group_by(want) %>%
+  summarise(n=sum(n))
+ultimate_want
+```
+
+```{r}
+ultimate_want %>% mutate(want=reorder(want,n)) %>% 
+  ggplot(aes(want,n)) + geom_col()+coord_flip()
 ```
 
