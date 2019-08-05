@@ -20,6 +20,9 @@ library(polite)
 library(reshape2)
 library(wordcloud)
 
+# very dark theme for ggplot
+source("ggplot_theme_black.r")
+
 ```
 
 Get names of all Ramones songs from azlyrics.com.  Use the `polite` package so we obey the robots.txt instructions at the site.
@@ -228,7 +231,8 @@ ultimate_want
 ```
 Now strip "to" so that everthing sounds like it comes after "wanna" instead of "want" and do some other clean up.
 ```{r}
-ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is ")) %>% 
+ultimate_want <- ultimate_want %>% 
+  mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is |^be with ")) %>% 
   group_by(want) %>%
   summarise(n=sum(n))
 ultimate_want
@@ -236,7 +240,11 @@ ultimate_want
 
 ```{r}
 ultimate_want %>% mutate(want=reorder(want,n)) %>% 
-  ggplot(aes(want,n)) + geom_col()+coord_flip()
+  ggplot(aes(want,n)) + geom_col()+coord_flip() +
+  theme_black() +
+  theme(axis.text.y = element_text(hjust=1,size=10))+ 
+  scale_fill_manual(values = c("red","darkgrey"))
+
 ```
 What the Ramones  DON'T want
 ```{r}
@@ -298,8 +306,9 @@ ultimate_want %>% mutate(want=reorder(want,n)) %>%
   labs(title="What Do The Ramones Want?",
        y="How Much Do The Ramones Want It?",
        x="") +
-  theme_dark() +
-  theme(axis.text.y =  element_text(size=7)) 
+  theme_black() +
+  scale_fill_manual(values = c("red","darkgrey"))+
+  theme(axis.text.y =  element_text(size=7,hjust=1)) 
 ```
 
 ```{r}
