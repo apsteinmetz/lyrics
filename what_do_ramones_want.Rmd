@@ -167,11 +167,11 @@ lyric_words_cleaned %>%
                    max.words = 100)
 ```
 
-Now lets find what the Ramones Want.  Let's look at the most common igrams, which would include the phrases like "I want" and "I wanna."
+Now lets find what the Ramones Want.  Let's look at the most common n-grams, which would include the phrases like "I want" and "I wanna."
 
 Start with shortest n-gram that is a complete thought and work up to longer phrases.  We take the the shortest phrase that makes sense unless appending more words doesn't change the frequency.  Then we take the longer phrase.  For instance if "I wanna steal some money" and "I wanna steal from the rich" both exist we take "I wanna steal" since it would have a higher frequency than either longer phrase.  In this case, the only phrase starting with "I wanna steal"  is "I wanna steal from the rich" so we use that.
 ```{r}
-want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted )"
+want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i just wanna )"
 
 get_ngrams <- function(lyric_df,n){
   min_instance = 0
@@ -196,39 +196,39 @@ What a human needs to do is decide which phrases are complete thoughts.  We manu
 
 ```{r}
 ultimate_want <- tibble()
-ultimate_want <- bind_rows(ultimate_want,want[c(2,4,8,11),])
+ultimate_want <- bind_rows(ultimate_want,want[c(2,4,8,11,16,20,21),])
 want <- ramones_lyrics %>% get_ngrams(4)
 want
 ```
 
 
 ```{r}
-ultimate_want <- bind_rows(ultimate_want,want[c(1,3,22,23),])
+ultimate_want <- bind_rows(ultimate_want,want[c(2,4,6,22,24,25,34,42,45,54,58),])
 want <- ramones_lyrics %>% get_ngrams(5)
 want
 
 ```
 
 ```{r}
-ultimate_want <- bind_rows(ultimate_want,want[c(6,13,18),])
+ultimate_want <- bind_rows(ultimate_want,want[c(7,15,22,31,32),])
 want <- ramones_lyrics %>% get_ngrams(6)
 want
 
 ```
 ```{r}
-ultimate_want <- bind_rows(ultimate_want,want[c(3,8,13),])
+ultimate_want <- bind_rows(ultimate_want,want[c(9,14,17,27,28,29,41),])
 want <- ramones_lyrics %>% get_ngrams(7)
 want
 ```
 
 ```{r}
-ultimate_want <- bind_rows(ultimate_want,want[c(4),])
+ultimate_want <- bind_rows(ultimate_want,want[c(1,5,12,22,87),])
 ultimate_want <- ultimate_want %>% arrange(desc(n)) %>% select(-rowname)
 ultimate_want
 ```
 Now strip "to" so that everthing sounds like it comes after "wanna" instead of "want" and do some other clean up.
 ```{r}
-ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"to |ed |wanna ")) %>% 
+ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is ")) %>% 
   group_by(want) %>%
   summarise(n=sum(n))
 ultimate_want
@@ -286,7 +286,9 @@ ultimate_want <- bind_rows(ultimate_want,want[c(6),])
 ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"to ")) %>% 
   group_by(want) %>%
   summarise(n=sum(n)) %>%   
-  mutate(sentiment = ifelse(n > 0,"want","don't want"))
+  mutate(sentiment = ifelse(n > 0,"want","don't want")) %>% 
+  arrange(desc(n)) %>% 
+  mutate(want=str_to_title(want))
 ultimate_want
 ```
 
@@ -295,20 +297,29 @@ ultimate_want %>% mutate(want=reorder(want,n)) %>%
   ggplot(aes(want,n,fill=sentiment)) + geom_col()+coord_flip()+
   labs(title="What Do The Ramones Want?",
        y="How Much Do The Ramones Want It?",
-       x="")
+       x="") +
+  theme_dark() +
+  theme(axis.text.y =  element_text(size=7)) 
 ```
 
 ```{r}
 library(scales)
-ultimate_want %>% filter(sentiment=="want") %>% 
-  mutate(want=reorder(want,n)) %>% 
-  ggplot(aes("",n,fill=want)) + geom_col()+ 
-  coord_polar("y",start=0) + 
-  theme_void() +
-  labs(title="What Do The Ramones Want?",
-       x = "")+ 
-  geom_text(aes(y = n/3 + c(0, cumsum(n)[-length(n)]), 
-            label = scales::percent(n/100)), size=5)
-  
+
+collapsed_want <- ultimate_want %>%
+  filter(sentiment=="want") %>%
+  mutate(want = ifelse(n<3,"Other",want)) %>%
+  group_by(want) %>% 
+  summarise(n=sum(n)) %>% 
+  arrange(desc(n)) %>% 
+  {.}
+
+ with(collapsed_want,
+      pie(n, 
+          labels=paste0(as.character(want), " ", n, "%"),
+          col=c("brown","red","black","darkblue","pink","purple"),
+          radius=1,
+          density=30,
+          bg="sienna",
+          main="The Ramones Wanna..."))
 ```
 
