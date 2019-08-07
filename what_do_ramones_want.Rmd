@@ -12,6 +12,12 @@ Very cool, but is it accurate?  You may accuse me of being that pedantic "Comic 
 <iframe src="https://giphy.com/embed/26tk0Emxz61hdKEog" width="480" height="360" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/season-13-the-simpsons-13x8-26tk0Emxz61hdKEog">via GIPHY</a></p>
 
 ```{r}
+#```{r global_options, include=FALSE}
+#knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path='Figs/',
+#                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r message=FALSE, warning=FALSE}
 #devtools::install_github("dmi3kno/polite")
 library(tidyverse)
 library(tidytext)
@@ -19,6 +25,7 @@ library(rvest)
 library(polite)
 library(reshape2)
 library(wordcloud)
+library(scales)
 
 # very dark theme for ggplot
 source("ggplot_theme_black.r")
@@ -98,7 +105,7 @@ lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(wor
 ```
 
 ```{r}
-lyric_words_cleaned <- lyric_words %>% anti_join(get_stopwords())
+lyric_words_cleaned <- lyric_words %>% anti_join(get_stopwords(),by="word")
 
 #quick sentiment analysis
 positive <- get_sentiments("bing") %>%
@@ -325,8 +332,6 @@ ultimate_want %>% mutate(want=reorder(want,n)) %>%
 Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts.  Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle let's make a version of Grayhood's poster with our data.  So it's not a complete mess we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" the poster includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
 
 ```{r}
-library(scales)
-
 collapsed_want <- ultimate_want %>%
   filter(sentiment=="want") %>%
   mutate(want = ifelse(n<3,"Other",want)) %>%
