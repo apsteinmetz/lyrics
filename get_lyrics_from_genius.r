@@ -33,11 +33,7 @@ artist_albums <- ramones_albums %>%
   enframe(name=NULL,value="album") %>% 
   mutate(artist="Ramones") %>% 
   select(artist,album) %>%
-#  filter(album == "Leave Home") %>%
   {.}
 
 ramones_lyrics_genius <- genius::add_genius(artist_albums,artist,album)
-
-lyrics <- lyrics %>% mutate(artist = "Ramones",album = "¡Adios Amigos!") %>% select(artist,album,everything())
-ramones_lyrics_genius <- bind_rows(ramones_lyrics_genius,lyrics)
 save(ramones_lyrics_genius,file="data/ramones_lyrics_genius.rdata")
