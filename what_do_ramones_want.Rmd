@@ -62,7 +62,7 @@ song_list %>% head(5)
 
 Now get all the lyrics.  I wrote a function that returns a single string with the a single song's lyrics.  To get all the songs I used a `for` loop to go the the list of lyric URLs. Why did I do this rather than using the fancier `apply` or `map`?  Because the risk of failure is high.  Depsite using `polite` I got locked out of the site after many songs and had to wait some time before trying again.  Had we used `map` the accumulated lyrics retrieved prior to getting shut out would be lost.  This way we can just manually set the index of the URL list to pick up at the point we got shut out.
 
-I am not happy with this function.  IT relies on the lyrics always being the 22nd `<div>` tag on the page.  A better way would identify smartly which block of the page contained the lyrics.  The code shows in a commented line one attempt at this.  It didn't work.
+I am not happy with this function.  It relies on the lyrics always being the 22nd `<div>` tag on the page.  A better way would identify smartly which block of the page contained the lyrics.  The code shows in a commented line one attempt at this.  It didn't work.
 ```{r}
 #make a function to get lyrics
 
