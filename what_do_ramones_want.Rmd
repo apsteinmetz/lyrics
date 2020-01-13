@@ -3,7 +3,7 @@ title: "What Do the Ramones Want?"
 output: html_notebook
 ---
 Recently I saw a tweet that shared this hilarious poster.
-![](https://images.squarespace-cdn.com/content/v1/51f30200e4b086a9c879cd57/1376157201580-0W1TZ1X85OQAHMLRS6OI/ke17ZwdGBToddI8pDm48kPoswlzjSVMM-SxOp7CV59BZw-zPPgdn4jUwVcJE1ZvWQUxwkmyExglNqGp0IvTJZamWLI2zvYWH8K3-s_4yszcp2ryTI0HqTOaaUohrI8PIeQMKeWYgwh6Mn73n2eZmZLHHpcPIxgL2SArp_rN2M_AKMshLAGzx4R3EDFOm1kBS/Wants4thEdition.jpg?format=1000w)
+![](img/Wants4thEdition.jpg)
 
 Dan Gneiding (aka Grayhood) is the graphic designer who created this.  You can buy it [here](http://grayhood.com/shop/ramones-vs-misfits-1-2-3-4th-edition)
 
@@ -11,7 +11,7 @@ Very cool, but how accurate is it?  I asked Dan and says he took some artistic l
 
 <iframe src="https://giphy.com/embed/26tk0Emxz61hdKEog" width="480" height="360" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/season-13-the-simpsons-13x8-26tk0Emxz61hdKEog">via GIPHY</a></p>
 
-The Ramones hold a special place in my heart. As a college student in central Ohio, in the late 70s, my frat brothers and I were huge fans.  We were completely ridiculous of course. Preppy nerds bobbing to "Beat on the Brat"  The Sigma Chis thought we were idiots (Lynrd Skynrd? Come on! History has judged). I never saw the Ramones at CBGBs but when we heard they were coming to a cowboy bar on the notorious High St. across from Ohio State, we were thrilled.  I blew off studying for a Poly Sci mid-term the next day.  I got my worst college grade ever but it was totally worth it. I said my future self would thank me and I was right!
+The Ramones hold a special place in my heart. As a college student in central Ohio, in the late 70s, my frat brothers and I were huge fans.  We were completely ridiculous of course. Preppy nerds bobbing to "Beat on the Brat"  The Sigma Chis thought we were idiots (Lynrd Skynrd? Come on! History has judged). I never saw the Ramones at CBGBs but when we heard they were coming to a cowboy bar on notorious High St. across from Ohio State, we were thrilled.  I blew off studying for a Poly-Sci mid-term the next day.  I got my worst college grade ever but it was totally worth it. I said my future self would thank me and I was right!
 
 Without any further adieu, hey, ho, let's go!
 
@@ -25,6 +25,7 @@ library(polite)
 library(reshape2)
 library(wordcloud)
 library(scales)
+library(ggthemes)
 
 # very dark theme for ggplot courtesy of
 #https://gist.github.com/jslefche/eff85ef06b4705e6efbc
@@ -97,7 +98,8 @@ Make the list of lyric strings into a complete data frame with all the trimmings
 ramones_lyrics <- song_list %>%  
   bind_cols(enframe(all_lyrics,name="corpus_order",value="lyrics")) %>% 
   mutate(band="Ramones") %>% 
-  select(band,song_name,lyrics,lyric_url)
+  select(band,song_name,lyrics,corpus_order,lyric_url) %>% 
+  {.}
 
 ramones_lyrics
 ```
@@ -154,7 +156,7 @@ lyric_words_cleaned %>%
   ggplot(aes(song_name, net_sentiment, fill = sentiment)) +
   geom_col() +
   coord_flip() +
-  labs(title="How Happy are Ramones Songs?",
+  labs(title="How Happy are RAMONES Songs?",
        y = "Balance of Postive to Negative Words",
        x= "") +
     theme_black() +
@@ -163,7 +165,7 @@ lyric_words_cleaned %>%
 ```
 
 What is overall sentiment?
-Filter out "punk" since this word is not a negative Ramones songs.
+"Sentiment" is a funny thing.  We can guess at the sentiment of words without context but we can't be sure.  Certainly "punk" is not a negative word in the world of the Ramones so we should probably filter that out.
 ```{r}
 lyric_words_cleaned %>%
   filter(word != "punk") %>% 
@@ -171,7 +173,7 @@ lyric_words_cleaned %>%
   count(sentiment,sort=TRUE) %>% 
   ggplot(aes(sentiment, n, fill = sentiment)) +
   geom_col() +
-  labs(title="How Happy are the Ramones?",
+  labs(title="How Happy are the RAMONES?",
        y = "Word Count (excluding 'Punk')",
        x= "") +
     theme_black() +
@@ -193,77 +195,83 @@ lyric_words_cleaned %>%
 }
 ```
 
-Now lets find what the Ramones Want.  Let's look at the most common n-grams, which would include the phrases like "I want" and "I wanna."
+Now lets find what the Ramones Want.  An n-gram is simply a cluster of words of length n.  Let's look at the most common n-grams, which would include the phrases like "I want" and "I wanna."
 
 Start with shortest n-gram that is a complete thought and work up to longer phrases.  We take the the shortest phrase that makes sense unless appending more words doesn't change the frequency.  Then we take the longer phrase.  For instance if "I wanna steal some money" and "I wanna steal from the rich" both exist we take "I wanna steal" since it would have a higher frequency than either longer phrase.  In this case, the only phrase starting with "I wanna steal"  is "I wanna steal from the rich" so we use that.
 ```{r}
 want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i just wanna )"
 
-get_ngrams <- function(lyric_df,n){
+get_ngrams <- function(lyrics,n,prefixes=""){
   min_instance = 0
-  lyric_ngram <- ramones_lyrics %>% 
+  lyric_ngram <- lyrics %>% 
     select(-band,-lyric_url) %>% 
     unnest_tokens(ngram,lyrics,token = "ngrams",n=n) %>% 
     group_by(ngram) %>% 
-    filter(str_detect(ngram,want_phrases)) %>% 
+    filter(str_detect(ngram,prefixes)) %>% 
     count() %>% 
     arrange(desc(n)) %>% 
-    filter(n>min_instance) %>% mutate(want=str_remove(ngram,want_phrases)) %>% 
+    filter(n>min_instance) %>% mutate(want=str_remove(ngram,prefixes)) %>% 
     rownames_to_column()
   return(lyric_ngram)
   
 }
 
-want <- ramones_lyrics %>% get_ngrams(3)
+want <- ramones_lyrics %>% get_ngrams(3,want_phrases)
 want
 ```
 
 What a human needs to do is decide which phrases are complete thoughts.  We manually select the row numbers to build our ultimate table and build a longer n-gram table to flesh out those that are not.
 
+Remember what I said before about data wrangling?  Well, getting the words was easy.  Determining meaningful phrases is not.  If this was Spotify, our AI could figure these out, but it is not Spotify. This is a manual,iterative process of taking ever-longer n-grams until we don't see any sensible new phrases.  I won't bore you with every iteration so let's skip ahead.
+
 ```{r}
-ultimate_want <- tibble()
-ultimate_want <- bind_rows(ultimate_want,want[c(2,4,8,11,16,20,21),])
-want <- ramones_lyrics %>% get_ngrams(4)
-want
+# make "wanna" in to "want to" which also frequently appears so we get a good count.
+ramones_lyrics <- ramones_lyrics %>% mutate(lyrics=str_replace_all(lyrics,"wanna","want to"))
+want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i just wanna )"
+do_want <- tibble()
+all_wants <- tibble() # for debugging
+# why make the code below a function, if we only call it once?
+# Since we cumulatively modify all_wants each step is dependent on the prior one executing first
+# this organizes the code into a block that tells future self to execute as a block
+build_wants <- function(all_wants) {
+  #select the 3-gram phrases that are complete thoughts using manual inspection
+  want <- ramones_lyrics %>% get_ngrams(3,want_phrases)
+  all_wants <- bind_rows(all_wants,want[c(2,3,11),])
+  # move to the 4-gram phrases, etc
+  want <- ramones_lyrics %>% get_ngrams(4,want_phrases)
+  all_wants <- bind_rows(all_wants,want[c(5,17,18,23,4,26,27,31,44,40),])
+  want <- ramones_lyrics %>% get_ngrams(5,want_phrases)
+  #want
+  all_wants <- bind_rows(all_wants,want[c(1,2,6,8,26,28,41),])
+  want <- ramones_lyrics %>% get_ngrams(6,want_phrases)
+  #want
+  all_wants <- bind_rows(all_wants,want[c(14,36,43,53),])
+  want <- ramones_lyrics %>% get_ngrams(7,want_phrases)
+  #want
+  all_wants <- bind_rows(all_wants,want[c(5,9,14,15,27,28,51),])
+  want <- ramones_lyrics %>% get_ngrams(8,want_phrases)
+  #want
+  all_wants <- bind_rows(all_wants,want[c(14,22),])
+  return (all_wants)
+}
+
+do_want <- build_wants(do_want)
+do_want <- do_want %>% arrange(desc(n))
+do_want
 ```
-
-This is a manual,iterative process of taking ever-longer n-grams until we don't see any sensible new phrases.  I won't bore you with every iteration so let's skip ahead
-
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(2,4,6,22,24,25,34,42,45,54,58),])
-want <- ramones_lyrics %>% get_ngrams(5)
-want
-
-```
-
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(7,15,22,31,32,43),])
-want <- ramones_lyrics %>% get_ngrams(6)
-want
-
-```
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(9,14,17,27,28,29,41),])
-want <- ramones_lyrics %>% get_ngrams(7)
-want
-```
-
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(1,5,12,22,87),])
-ultimate_want <- ultimate_want %>% arrange(desc(n)) %>% select(-rowname)
-ultimate_want
-```
-Now strip some extraneous words so all the phrases sound reasonable.
+Clean up the text and tally the instances of each want.
 ```{r}
-ultimate_want <- ultimate_want %>% 
-  mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is |^be with ")) %>% 
+do_want_clean <- do_want %>% 
+#  mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is |^be with ")) %>% 
+  mutate(want=str_to_title(want)) %>% 
   group_by(want) %>%
-  summarise(n=sum(n))
-ultimate_want
+  summarise(n=sum(n)) %>% 
+  arrange(desc(n))
+do_want_clean
 ```
 
 ```{r}
-ultimate_want %>% mutate(want=reorder(want,n)) %>% 
+do_want_clean %>% mutate(want=reorder(want,n)) %>% 
   ggplot(aes(want,n)) + geom_col()+coord_flip() +
   theme_black() +
   theme(axis.text.y = element_text(hjust=1,size=10))+ 
@@ -272,70 +280,69 @@ ultimate_want %>% mutate(want=reorder(want,n)) %>%
 ```
 What DON'T the Ramones want? Once again, we go through the same iterative process with different phrase stems.
 ```{r}
-want_phrases <- "^(i don't wanna |i don't want |we don't want |we don't wanna |i didn't want )"
-
-want <- ramones_lyrics %>% get_ngrams(5) %>% mutate(n = -n)
-want
+dont_want <- tibble()
+all_wants <- tibble() # for debugging only
+ramones_lyrics <- ramones_lyrics %>% mutate(lyrics=str_replace_all(lyrics,"wanna","want to"))
+want_phrases <- "^(i don't want |we don't want |i didn't want )"
+build_dont_wants <- function(all_wants) {
+  want <- ramones_lyrics %>% get_ngrams(4,want_phrases) %>% mutate(n = -n)
+  all_wants <- bind_rows(all_wants,want[c(2),])
+#  want
+  want <- ramones_lyrics %>% get_ngrams(5,want_phrases) %>% mutate(n = -n)
+  #want
+  all_wants <- bind_rows(all_wants,want[c(4,5,6,10,12),])
+  want <- ramones_lyrics %>% get_ngrams(6,want_phrases) %>% mutate(n = -n)
+  #want
+  all_wants <- bind_rows(all_wants,want[c(1),])
+  want <- ramones_lyrics %>% get_ngrams(7,want_phrases) %>% mutate(n = -n)
+#  want
+  all_wants <- bind_rows(all_wants,want[c(2,30,31,33),])
+  want <- ramones_lyrics %>% get_ngrams(8,want_phrases) %>% mutate(n = -n)
+#  want
+  all_wants <- bind_rows(all_wants,want[c(13,14,18,29,34),])
+  want <- ramones_lyrics %>% get_ngrams(9,want_phrases) %>% mutate(n = -n)
+#  want
+  all_wants <- bind_rows(all_wants,want[8,])
+  want <- ramones_lyrics %>% get_ngrams(10,want_phrases) %>% mutate(n = -n)
+#  want
+  #there it is - Pet Sematary!
+  all_wants <- bind_rows(all_wants,want[c(2),])
+}
+dont_want <- build_dont_wants(dont_want)
+dont_want <- dont_want %>% arrange(n) %>% select(-rowname)
+dont_want_clean <- dont_want %>% 
+#  mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is |^be with ")) %>% 
+  mutate(want=str_to_title(want)) %>% 
+  group_by(want) %>%
+  summarise(n=sum(n)) %>% 
+  arrange(n)
+dont_want_clean
 ```
 
-
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(1),])
-want <- ramones_lyrics %>% get_ngrams(6) %>% mutate(n = -n)
-want
-```
-
-
-```{r  include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(1,2,3),])
-want <- ramones_lyrics %>% get_ngrams(7) %>% mutate(n = -n)
-want
-
-```
-
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(3,5),])
-want <- ramones_lyrics %>% get_ngrams(8) %>% mutate(n = -n)
-want
-
-```
-```{r include=FALSE}
-ultimate_want <- bind_rows(ultimate_want,want[c(5,9),])
-want <- ramones_lyrics %>% get_ngrams(9) %>% mutate(n = -n)
-want
-
-```
-```{r include=FALSE}
-# nuthin this round ultimate_want <- bind_rows(ultimate_want,want[c(5,9),])
-want <- ramones_lyrics %>% get_ngrams(10) %>% mutate(n = -n)
-want
-
-```
 
 ```{r}
-#there it is - Pet Sematary!
-ultimate_want <- bind_rows(ultimate_want,want[c(6),])
-ultimate_want <- ultimate_want %>% mutate(want = str_remove(want,"to ")) %>% 
+ultimate_want <- bind_rows(do_want_clean,dont_want_clean) %>% 
   group_by(want) %>%
   summarise(n=sum(n)) %>%   
   mutate(sentiment = ifelse(n > 0,"want","don't want")) %>% 
-  arrange(desc(n)) %>% 
-  mutate(want=str_to_title(want))
+  arrange(n) %>% 
+#  mutate(want=str_to_title(want)) %>% 
+  {.}
 ultimate_want
 ```
 
 ```{r}
-ultimate_want %>% mutate(want=reorder(want,n)) %>% 
+p <- ultimate_want %>% mutate(want=reorder(want,n)) %>% 
   ggplot(aes(want,n,fill=sentiment)) + geom_col()+coord_flip()+
-  labs(title="What Do The Ramones Want?",
-       y="How Much Do The Ramones Want It?",
-       x="") +
-  theme_black() +
+  labs(title="What Do The RAMONES Want?",
+       y="How Much Do The RAMONES Want It?",
+       x="") + theme_black()
+p + 
   scale_fill_manual(values = c("red","darkgrey"))+
   theme(axis.text.y =  element_text(size=7,hjust=1)) 
 ```
 
-Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts.  Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle let's make a version of Grayhood's poster with our data.  So it's not a complete mess we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" the poster includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
+Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts. Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle let's make a version of Grayhood's poster with our data.  So it's not a complete mess we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" which the poster above includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
 
 ```{r}
 collapsed_want <- ultimate_want %>%
@@ -353,6 +360,27 @@ collapsed_want <- ultimate_want %>%
           radius=1,
           density=30,
           bg="sienna",
-          main="The Ramones Wanna..."))
+          main="The Ramones Want..."))
 ```
+
+```{r}
+collapsed_want <- ultimate_want %>%
+  filter(sentiment=="don't want") %>%
+  mutate(n = -n) %>% 
+  mutate(want = ifelse(n<2,"Other",want)) %>%
+  group_by(want) %>% 
+  summarise(n=sum(n)) %>% 
+  arrange(desc(n)) %>% 
+  {.}
+
+ with(collapsed_want,
+      pie(n, 
+          labels=paste0(as.character(want), " ", n, "%"),
+          col=c("brown","red","black","darkblue","pink","purple"),
+          radius=1,
+          density=30,
+          bg="sienna",
+          main="The RAMONES Don't Want..."))
+```
+
 
