@@ -1,17 +1,12 @@
 # get lyrics for an artist
-# devtools::install_github("ewenme/geniusr")
-library(geniusr)
 library(genius)
 library(tidyverse)
+
+#make sure you have this
 geniusr::genius_token()
 
 # get all lyrics from an album
-lyrics <- genius::genius_album("Ramones","¡Adios Amigos!")
-
-tracklist <- geniusr::get_album_tracklist_search(artist_name = "Ramones",
-                                                 album_name = "Ramones")
-geniusr::get_lyrics_search(artist_name = "Kanye West",
-                  song_title = "Good Morning")
+#lyrics <- genius::genius_album("Ramones","¡Adios Amigos!")
 
 ramones_albums <- c(
   "Ramones",
