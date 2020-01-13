@@ -6,7 +6,7 @@ library(tidyverse)
 geniusr::genius_token()
 
 # get all lyrics from an album
-lyrics <- genius::genius_album("Ramones","Leave Home")
+lyrics <- genius::genius_album("Ramones","¡Adios Amigos!")
 
 tracklist <- geniusr::get_album_tracklist_search(artist_name = "Ramones",
                                                  album_name = "Ramones")
@@ -27,7 +27,7 @@ ramones_albums <- c(
   "Brain Drain",
   "Mondo Bizarro",
   "Acid Eaters",
-  "¡Adios Amigo!"  
+  "¡Adios Amigos!"  
 )
 artist_albums <- ramones_albums %>% 
   enframe(name=NULL,value="album") %>% 
@@ -37,3 +37,7 @@ artist_albums <- ramones_albums %>%
   {.}
 
 ramones_lyrics_genius <- genius::add_genius(artist_albums,artist,album)
+
+lyrics <- lyrics %>% mutate(artist = "Ramones",album = "¡Adios Amigos!") %>% select(artist,album,everything())
+ramones_lyrics_genius <- bind_rows(ramones_lyrics_genius,lyrics)
+save(ramones_lyrics_genius,file="data/ramones_lyrics_genius.rdata")
