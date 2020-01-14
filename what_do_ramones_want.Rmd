@@ -211,7 +211,7 @@ build_wants <- function(all_wants) {
   all_wants <- bind_rows(all_wants,want[c(2,8,11,13),])
   # move to the 4-gram phrases, etc
   want <- ramones_lyrics %>% get_ngrams(4,want_phrases)
-  all_wants <- bind_rows(all_wants,want[c(5,6,7,9,13,14,17,24,28,30,31,37),])
+  all_wants <- bind_rows(all_wants,want[c(5,6,9,13,14,17,24,28,30,31,37),])
   want <- ramones_lyrics %>% get_ngrams(5,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(3,4,6,9,21,22),])
   want <- ramones_lyrics %>% get_ngrams(6,want_phrases)
@@ -227,24 +227,15 @@ build_wants <- function(all_wants) {
 
 do_want <- build_wants(do_want)
 do_want <- do_want %>% 
+  mutate(want=str_to_title(want)) %>% 
   group_by(want) %>% 
   summarise(n=sum(n)) %>% 
   arrange(desc(n))
 do_want
 ```
-Clean up the text and tally the instances of each want.
-```{r}
-do_want_clean <- do_want %>% 
-#  mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is |^be with ")) %>% 
-  mutate(want=str_to_title(want)) %>% 
-  group_by(want) %>%
-  summarise(n=sum(n)) %>% 
-  arrange(desc(n))
-do_want_clean
-```
 
 ```{r}
-do_want_clean %>% mutate(want=reorder(want,n)) %>% 
+do_want %>% mutate(want=reorder(want,n)) %>% 
   ggplot(aes(want,n)) + geom_col()+coord_flip() +
   theme_black() +
   theme(axis.text.y = element_text(hjust=1,size=10))+ 
@@ -255,7 +246,7 @@ What DON'T the Ramones want? Once again, we go through the same iterative proces
 ```{r}
 dont_want <- tibble()
 all_wants <- tibble() # for debugging only
-ramones_lyrics <- ramones_lyrics %>% mutate(lyrics=str_replace_all(lyrics,"wanna","want to"))
+ramones_lyrics <- ramones_lyrics %>% mutate(lyric=str_replace_all(lyric,"wanna","want to"))
 want_phrases <- "^(i don't want |we don't want |i didn't want )"
 build_dont_wants <- function(all_wants) {
   want <- ramones_lyrics %>% get_ngrams(4,want_phrases) %>% mutate(n = -n)
@@ -263,43 +254,39 @@ build_dont_wants <- function(all_wants) {
 #  want
   want <- ramones_lyrics %>% get_ngrams(5,want_phrases) %>% mutate(n = -n)
   #want
-  all_wants <- bind_rows(all_wants,want[c(4,5,6,10,12),])
+  all_wants <- bind_rows(all_wants,want[c(3,5,6,7,9,11,15),])
   want <- ramones_lyrics %>% get_ngrams(6,want_phrases) %>% mutate(n = -n)
   #want
-  all_wants <- bind_rows(all_wants,want[c(1),])
+  all_wants <- bind_rows(all_wants,want[c(1,7),])
   want <- ramones_lyrics %>% get_ngrams(7,want_phrases) %>% mutate(n = -n)
 #  want
-  all_wants <- bind_rows(all_wants,want[c(2,30,31,33),])
+  all_wants <- bind_rows(all_wants,want[c(2,17),])
   want <- ramones_lyrics %>% get_ngrams(8,want_phrases) %>% mutate(n = -n)
-#  want
-  all_wants <- bind_rows(all_wants,want[c(13,14,18,29,34),])
+  all_wants <- bind_rows(all_wants,want[c(7,8,9,16),])
   want <- ramones_lyrics %>% get_ngrams(9,want_phrases) %>% mutate(n = -n)
 #  want
-  all_wants <- bind_rows(all_wants,want[8,])
+  all_wants <- bind_rows(all_wants,want[c(3,10,12),])
   want <- ramones_lyrics %>% get_ngrams(10,want_phrases) %>% mutate(n = -n)
 #  want
   #there it is - Pet Sematary!
-  all_wants <- bind_rows(all_wants,want[c(2),])
+  all_wants <- bind_rows(all_wants,want[c(1),])
 }
 dont_want <- build_dont_wants(dont_want)
-dont_want <- dont_want %>% arrange(n) %>% select(-rowname)
-dont_want_clean <- dont_want %>% 
-#  mutate(want = str_remove(want,"^to |ed |wanna |^was to |^is |^be with ")) %>% 
+dont_want <- dont_want %>%
   mutate(want=str_to_title(want)) %>% 
   group_by(want) %>%
   summarise(n=sum(n)) %>% 
   arrange(n)
-dont_want_clean
+dont_want
 ```
 
 
 ```{r}
-ultimate_want <- bind_rows(do_want_clean,dont_want_clean) %>% 
+ultimate_want <- bind_rows(do_want,dont_want) %>% 
   group_by(want) %>%
   summarise(n=sum(n)) %>%   
   mutate(sentiment = ifelse(n > 0,"want","don't want")) %>% 
   arrange(n) %>% 
-#  mutate(want=str_to_title(want)) %>% 
   {.}
 ultimate_want
 ```
@@ -320,7 +307,7 @@ Sometimes, late at night, after everyone else is asleep, I hide under the covers
 ```{r}
 collapsed_want <- ultimate_want %>%
   filter(sentiment=="want") %>%
-  mutate(want = ifelse(n<3,"Other",want)) %>%
+  mutate(want = ifelse(n<4,"Other",want)) %>%
   group_by(want) %>% 
   summarise(n=sum(n)) %>% 
   arrange(desc(n)) %>% 
