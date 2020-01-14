@@ -1,6 +1,7 @@
 # get lyrics for an artist
 library(genius)
 library(tidyverse)
+library(tidytext)
 
 #make sure you have this
 geniusr::genius_token()
@@ -38,5 +39,5 @@ if (file.exists("data/ramones_lyrics_genius.rdata")){
 }
 
 
-
+lyric_words <- ramones_lyrics_genius %>%  unnest_tokens(word,lyric)
 
