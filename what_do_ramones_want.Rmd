@@ -28,92 +28,57 @@ library(reshape2)
 library(wordcloud)
 library(scales)
 library(ggthemes)
+library(genius)
 
 # very dark theme for ggplot courtesy of
 #https://gist.github.com/jslefche/eff85ef06b4705e6efbc
 source("ggplot_theme_black.r")
 
 ```
-There are many lyric sites on the web I chose [](azlyrics.com) because the simple layout of the site made it easy to scrape.  We want to be good netizens, of course.  A new package (still in development as of this writing). `polite` makes it trivially easy to respect restrictions on site scraping found in the `robots.txt` file found at most commercial sites by using the functions `polite::bow() %>% polite::scrape() %>% rvest::html_nodes()`.  My previous work has not done this so I am happy to see this package arrive.  I think it needs a `grovel()` function though.
 
-As usual when I do my notebooks iteratively, I save scraped data and don't go out to the web if I have previously retrieved it.  Check for it first.
-
-First, we retrieve the urls for each song from the band page.
 ```{r}
-if (file.exists("data/ramones_song_list.rdata")){
-  load("data/ramones_song_list.rdata")
-} else {
-# be polite. get scraping parameters.
-base_url <- "https://azlyrics.com"
- song_list_raw <- polite::bow("https://azlyrics.com/r/ramones.html") %>% 
-   polite::scrape() %>%
-   rvest::html_nodes("#listAlbum a")
+#make sure you have a Genius API token
+# my token is in the .Reviron file
 
-song_list <- song_list_raw %>% 
-  rvest::html_attr("href") %>% 
-  tibble::enframe(name = NULL,value = "lyric_url") %>% 
-  dplyr::mutate(song_name = html_text(song_list_raw)) %>% 
-  mutate(lyric_url=str_replace(lyric_url,"..",base_url))
-save(song_list,file="data/ramones_song_list.rdata")
-}
-
-song_list %>% head(5)
-```
-
-Now get all the lyrics.  I wrote a function that returns a single string with the a single song's lyrics.  To get all the songs I used a `for` loop to go the the list of lyric URLs. Why did I do this rather than using the fancier `apply` or `map`?  Because the risk of failure is high.  Depsite using `polite` I got locked out of the site after many songs and had to wait some time before trying again.  Had we used `map` the accumulated lyrics retrieved prior to getting shut out would be lost.  This way we can just manually set the index of the URL list to pick up at the point we got shut out.
-
-I am not happy with this function.  It relies on the lyrics always being the 22nd `<div>` tag on the page.  A better way would identify smartly which block of the page contained the lyrics.  The code shows in a commented line one attempt at this.  It didn't work.
-```{r}
-#make a function to get lyrics
-
-get_lyric <- function(lyric_url){
-  lyric <- bow(lyric_url) %>% 
-    scrape() %>% 
-    #    /html/body/div[4]/div/div[2]/div[5]
-    # body > div.container.main-page > div > div.col-xs-12.col-lg-8.text-center > div:nth-child(8)
-    html_nodes("div") %>%
-    #not happy with this.  relies on the lyrics always being the 22nd `<div>` tag on the page.
-    .[22] %>% 
-    html_text() %>%
-    str_remove_all("\r") %>% 
-    str_replace_all("\n"," ") %>% 
-    str_trim()
-  return(lyric)
-}
-
-if (file.exists("data/raw_ramones_lyrics.rdata")){
-  load("data/raw_ramones_lyrics.rdata")
-} else {
-  all_lyrics <- NULL
-  all_urls <- song_list$lyric_url
-  for (lyric_url in all_urls){
-    lyric <- get_lyric(lyric_url)
-    all_lyrics <- c(all_lyrics,lyric)
-    
-  }
-  save(all_lyrics,file="data/raw_ramones_lyrics.rdata")
-}
-```
-This is a sample of what we get.
-```{r}
-print(all_lyrics[1])
-```
-
-It's just a text string.  Before we can use `tidytext` we'll make the list of lyric strings into a complete data frame with all the trimmings.
-```{r}
-ramones_lyrics <- song_list %>%  
-  bind_cols(enframe(all_lyrics,name="corpus_order",value="lyrics")) %>% 
-  mutate(band="Ramones") %>% 
-  select(band,song_name,lyrics,corpus_order,lyric_url) %>% 
+ramones_albums <- tribble(
+  ~album, ~year,
+  "Ramones", 1976,
+  "Leave Home", 1977,
+  "Rocket To Russia", 1977,
+  "Road To Ruin", 1978,
+  "End Of The Century", 1980,
+  "Pleasant Dreams", 1981,
+  "Subterranean Jungle", 1983,
+  "Too Tough To Die", 1984,
+  "Animal Boy", 1986,
+  "Halfway To Sanity",1987,
+  "Brain Drain",1989,
+  "Mondo Bizarro",1992,
+  "Acid Eaters",1993,
+  "¡Adios Amigos!",1995
+)
+artist_albums <- ramones_albums %>% 
+  mutate(artist="Ramones") %>% 
+  select(artist,album) %>%
   {.}
 
-ramones_lyrics
+if (file.exists("data/ramones_lyrics_genius.rdata")){
+  load("data/ramones_lyrics_genius.rdata")
+} else {
+  ramones_lyrics_genius <- genius::add_genius(artist_albums,artist,album)
+  save(ramones_lyrics_genius,file="data/ramones_lyrics_genius.rdata")
+}
+
 ```
+
 
 Most projects require a huge amount of data wrangling before we can get any real analysis done.  This project is pretty clean.  We are already nearly good to go.  Further, `tidytext` makes the remaining manipulation of the data soooo easy!  To wit, let's tokenize the data into individual words.
 ```{r}
-lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(word,lyrics)
-
+#lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(word,lyrics)
+ramones_lyrics <- ramones_lyrics_genius
+lyric_words <- ramones_lyrics  %>% 
+  unnest_tokens(word,lyric) %>%
+  rename(song_name=track_title)
 ```
 That's it!  Before we look at the what the Ramones want we might as well run the, now routine, sentiment analysis you may have learned about from Julia Silge and David Robinson [here](https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html).  The Ramones are no Jane Austen but, hey, they have feelings, ya know?
 
@@ -210,19 +175,20 @@ want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i 
 get_ngrams <- function(lyrics,n,prefixes=""){
   min_instance = 0
   lyric_ngram <- lyrics %>% 
-    select(-band,-lyric_url) %>% 
-    unnest_tokens(ngram,lyrics,token = "ngrams",n=n) %>% 
+#    select(-band,-lyric_url) %>% 
+    unnest_tokens(ngram,lyric,token = "ngrams",n=n) %>% 
     group_by(ngram) %>% 
     filter(str_detect(ngram,prefixes)) %>% 
     count() %>% 
     arrange(desc(n)) %>% 
-    filter(n>min_instance) %>% mutate(want=str_remove(ngram,prefixes)) %>% 
-    rownames_to_column()
+    filter(n>min_instance) %>% 
+    mutate(want=str_remove(ngram,prefixes)) %>% 
+   rowid_to_column()
   return(lyric_ngram)
   
 }
 
-want <- ramones_lyrics %>% get_ngrams(3,want_phrases)
+want <- ramones_lyrics %>% get_ngrams(5,want_phrases)
 want
 ```
 
@@ -232,37 +198,38 @@ Remember what I said before about data wrangling?  Well, getting the words was e
 
 ```{r}
 # make "wanna" in to "want to" which also frequently appears so we get a good count.
-ramones_lyrics <- ramones_lyrics %>% mutate(lyrics=str_replace_all(lyrics,"wanna","want to"))
-want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i just wanna )"
+ramones_lyrics <- ramones_lyrics %>% mutate(lyric=str_replace_all(lyric,"wanna","want to"))
 do_want <- tibble()
 all_wants <- tibble() # for debugging
 # why make the code below a function, if we only call it once?
 # Since we cumulatively modify all_wants each step is dependent on the prior one executing first
 # this organizes the code into a block that tells future self to execute as a block
 build_wants <- function(all_wants) {
+  want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i just wanna )"
   #select the 3-gram phrases that are complete thoughts using manual inspection
   want <- ramones_lyrics %>% get_ngrams(3,want_phrases)
-  all_wants <- bind_rows(all_wants,want[c(2,3,11),])
+  all_wants <- bind_rows(all_wants,want[c(2,8,11,13),])
   # move to the 4-gram phrases, etc
   want <- ramones_lyrics %>% get_ngrams(4,want_phrases)
-  all_wants <- bind_rows(all_wants,want[c(5,17,18,23,4,26,27,31,44,40),])
+  all_wants <- bind_rows(all_wants,want[c(5,6,7,9,13,14,17,24,28,30,31,37),])
   want <- ramones_lyrics %>% get_ngrams(5,want_phrases)
-  #want
-  all_wants <- bind_rows(all_wants,want[c(1,2,6,8,26,28,41),])
+  all_wants <- bind_rows(all_wants,want[c(3,4,6,9,21,22),])
   want <- ramones_lyrics %>% get_ngrams(6,want_phrases)
-  #want
-  all_wants <- bind_rows(all_wants,want[c(14,36,43,53),])
+  all_wants <- bind_rows(all_wants,want[c(1,11,12,22,25,28),])
   want <- ramones_lyrics %>% get_ngrams(7,want_phrases)
   #want
-  all_wants <- bind_rows(all_wants,want[c(5,9,14,15,27,28,51),])
+  all_wants <- bind_rows(all_wants,want[c(5,6,7,9,10,12,21),])
   want <- ramones_lyrics %>% get_ngrams(8,want_phrases)
   #want
-  all_wants <- bind_rows(all_wants,want[c(14,22),])
+  all_wants <- bind_rows(all_wants,want[c(7,3),])
   return (all_wants)
 }
 
 do_want <- build_wants(do_want)
-do_want <- do_want %>% arrange(desc(n))
+do_want <- do_want %>% 
+  group_by(want) %>% 
+  summarise(n=sum(n)) %>% 
+  arrange(desc(n))
 do_want
 ```
 Clean up the text and tally the instances of each want.
