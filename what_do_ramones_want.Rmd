@@ -1,7 +1,6 @@
 ---
 title: "What Do the Ramones Want?"
 output:
-  pdf_document: default
   html_notebook: default
 ---
 Recently I saw a tweet that shared this hilarious poster.
@@ -17,26 +16,31 @@ The Ramones hold a special place in my heart. As a college student in central Oh
 
 Without any further adieu, hey, ho, let's go!
 
-
 ```{r message=FALSE, warning=FALSE}
 #devtools::install_github("dmi3kno/polite")
 library(tidyverse)
 library(tidytext)
 library(rvest)
-library(polite)
 library(reshape2)
 library(wordcloud)
 library(scales)
-library(ggthemes)
 library(genius)
+#devtools::install_github('cttobin/ggthemr')
+library(ggthemr)
 
 # very dark theme for ggplot courtesy of
 #https://gist.github.com/jslefche/eff85ef06b4705e6efbc
-source("ggplot_theme_black.r")
-
+#source("ggplot_theme_black.r")
+ggthemr("earth",type="outer")
 ```
+## Get Lyrics from Genius API
 
-```{r}
+Have you ever spent an enormous amount of time on something, only to discover there was a much simpler way?  For this project we need a source of Ramones lyrics.  Originally, I built a very finicky web scraping routine to get lyrics from a site I commonly use in my browser.  I coaxed it to get all of the lyrics but I didn't want to share it in this post because you would likely not be able to get it to work smoothly.  Months passed then it occurred to me to Google "lyrics api" and, "viola!", I found <http://genius.com> and the genius R package by Josiah Parry, available on CRAN.  Access to the lyric API does require a free application access token. You can [generate one here](https://docs.genius.com/#/getting-started-h1).  I will leave installing the token called GENIUS_API_TOKEN into your R environment as an exercise for the reader.  There are numerous tutorials on this subject around.
+
+As always, we will be working in the `tidyverse` veracular.  First we build a data frame of album names and the year of release.  This gets fed into a single function `genius::add_genius` which returns all the lyrics.  I'm embarressed to think about the tangle mess of web scraping code I was previously using.
+
+As usual, we check to see if the file with all the downloaded data is already available so we can quickly iterate on features of our project.
+```{r get lyrics}
 #make sure you have a Genius API token
 # my token is in the .Reviron file
 
@@ -70,8 +74,6 @@ if (file.exists("data/ramones_lyrics_genius.rdata")){
 }
 
 ```
-
-
 Most projects require a huge amount of data wrangling before we can get any real analysis done.  This project is pretty clean.  We are already nearly good to go.  Further, `tidytext` makes the remaining manipulation of the data soooo easy!  To wit, let's tokenize the data into individual words.
 ```{r}
 #lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(word,lyrics)
@@ -130,7 +132,6 @@ lyric_words_cleaned %>%
   labs(title="How Happy are RAMONES Songs?",
        y = "Balance of Postive to Negative Words",
        x= "") +
-    theme_black() +
   scale_fill_manual(values = c("red","darkgrey"))+
   theme(axis.text.y =  element_text(size=7,hjust=1)) 
 ```
@@ -147,7 +148,6 @@ lyric_words_cleaned %>%
   labs(title="How Happy are the RAMONES?",
        y = "Word Count (excluding 'Punk')",
        x= "") +
-    theme_black() +
   scale_fill_manual(values = c("red","darkgrey"))+
   theme(axis.text.y =  element_text(size=7,hjust=1)) 
 
@@ -165,6 +165,24 @@ lyric_words_cleaned %>%
                    title.bg.colors="grey60")
 }
 ```
+
+## Sentiment Over Time
+```{r}
+lyric_words_cleaned %>%
+  filter(word != "punk") %>% 
+  inner_join(get_sentiments("bing"),by="word") %>%
+  count(sentiment,sort=TRUE) %>% 
+  ggplot(aes(sentiment, n, fill = sentiment)) +
+  geom_col() +
+  labs(title="How Happy are the RAMONES?",
+       y = "Word Count (excluding 'Punk')",
+       x= "") +
+  scale_fill_manual(values = c("red","darkgrey"))+
+  theme(axis.text.y =  element_text(size=7,hjust=1)) 
+
+```
+
+
 
 Now lets find what the Ramones Want.  An n-gram is simply a cluster of words of length n.  Let's look at the most common n-grams, which would include the phrases like "I want" and "I wanna."
 
@@ -231,15 +249,11 @@ do_want <- do_want %>%
   group_by(want) %>% 
   summarise(n=sum(n)) %>% 
   arrange(desc(n))
-do_want
-```
 
-```{r}
 do_want %>% mutate(want=reorder(want,n)) %>% 
-  ggplot(aes(want,n)) + geom_col()+coord_flip() +
-  theme_black() +
+  ggplot(aes(want,n)) + geom_col(fill="darkgrey")+coord_flip() +
   theme(axis.text.y = element_text(hjust=1,size=10))+ 
-  scale_fill_manual(values = c("red","darkgrey"))
+  scale_fill_manual(values = c("darkgrey"))
 
 ```
 What DON'T the Ramones want? Once again, we go through the same iterative process with different phrase stems.
@@ -280,6 +294,7 @@ dont_want <- dont_want %>%
 dont_want
 ```
 
+Finally we put it all together in a somewhat cramped plot.
 
 ```{r}
 ultimate_want <- bind_rows(do_want,dont_want) %>% 
@@ -288,21 +303,18 @@ ultimate_want <- bind_rows(do_want,dont_want) %>%
   mutate(sentiment = ifelse(n > 0,"want","don't want")) %>% 
   arrange(n) %>% 
   {.}
-ultimate_want
-```
 
-```{r}
 p <- ultimate_want %>% mutate(want=reorder(want,n)) %>% 
   ggplot(aes(want,n,fill=sentiment)) + geom_col()+coord_flip()+
   labs(title="What Do The RAMONES Want?",
        y="How Much Do The RAMONES Want It?",
-       x="") + theme_black()
+       x="")
 p + 
   scale_fill_manual(values = c("red","darkgrey"))+
   theme(axis.text.y =  element_text(size=7,hjust=1)) 
 ```
 
-Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts. Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle let's make a version of Grayhood's poster with our data.  So it's not a complete mess we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" which the poster above includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
+Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts. Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle (ahem) let's make a version of Grayhood's poster with our data.  So it's not a complete mess we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" which the poster above includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
 
 ```{r}
 collapsed_want <- ultimate_want %>%
@@ -343,4 +355,5 @@ collapsed_want <- ultimate_want %>%
           main="The RAMONES Don't Want..."))
 ```
 
+It must be comforting to know the Ramones want you more than anything but they aren't going down to the basement with you. Okay, so maybe this was a little fun.  Thanks for reading!
 
