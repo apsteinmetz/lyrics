@@ -1,6 +1,8 @@
 ---
 title: "What Do the Ramones Want?"
 output:
+  html_document:
+    df_print: paged
   html_notebook: default
 ---
 Recently I saw a tweet that shared this hilarious poster.
@@ -12,9 +14,13 @@ Very cool, but how accurate is it?  I asked Dan and says he took some artistic l
 
 <iframe src="https://giphy.com/embed/26tk0Emxz61hdKEog" width="480" height="360" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/season-13-the-simpsons-13x8-26tk0Emxz61hdKEog">via GIPHY</a></p>
 
+## Why the RAMONES?
 The Ramones hold a special place in my heart. As a college student in central Ohio, in the late 70s, my frat brothers and I were huge fans.  We were completely ridiculous of course. Preppy nerds bobbing to "Beat on the Brat"  The Sigma Chis thought we were idiots (Lynrd Skynrd? Come on! History has judged). I never saw the Ramones at CBGBs but when we heard they were coming to a cowboy bar on notorious High St. across from Ohio State, we were thrilled.  I blew off studying for a Poly-Sci mid-term the next day.  I got my worst college grade ever but it was totally worth it. I said my future self would thank me and I was right!
 
-Without any further adieu, hey, ho, let's go!
+Without any further adieu, hey, ho, let's go!  
+
+## Load Packages
+First, load packages.
 
 ```{r message=FALSE, warning=FALSE}
 #devtools::install_github("dmi3kno/polite")
@@ -25,17 +31,16 @@ library(reshape2)
 library(wordcloud)
 library(scales)
 library(genius)
+# very dark theme for ggplot courtesy of
 #devtools::install_github('cttobin/ggthemr')
 library(ggthemr)
+library(ggrepel)
 
-# very dark theme for ggplot courtesy of
-#https://gist.github.com/jslefche/eff85ef06b4705e6efbc
-#source("ggplot_theme_black.r")
 ggthemr("earth",type="outer")
 ```
 ## Get Lyrics from Genius API
 
-Have you ever spent an enormous amount of time on something, only to discover there was a much simpler way?  For this project we need a source of Ramones lyrics.  Originally, I built a very finicky web scraping routine to get lyrics from a site I commonly use in my browser.  I coaxed it to get all of the lyrics but I didn't want to share it in this post because you would likely not be able to get it to work smoothly.  Months passed then it occurred to me to Google "lyrics api" and, "viola!", I found <http://genius.com> and the genius R package by Josiah Parry, available on CRAN.  Access to the lyric API does require a free application access token. You can [generate one here](https://docs.genius.com/#/getting-started-h1).  I will leave installing the token called GENIUS_API_TOKEN into your R environment as an exercise for the reader.  There are numerous tutorials on this subject around.
+Have you ever spent an enormous amount of time on something, only to discover there was a much simpler way?  Yes, yes you have. For this project we need a source of Ramones lyrics.  Originally, I built a very finicky web scraping routine to get lyrics from a site I commonly use in my browser.  I coaxed it to get all of the lyrics but I didn't want to share it in this post because you would likely not be able to get it to work smoothly.  Months passed then it occurred to me to Google "lyrics api" and, "viola!", I found <http://genius.com> and the genius R package by Josiah Parry, available on CRAN.  Access to the lyric API does require a free application access token. You can [generate one here](https://docs.genius.com/#/getting-started-h1).  I will leave installing the token called GENIUS_API_TOKEN into your R environment as an exercise for the reader.  There are numerous tutorials on this subject around.
 
 As always, we will be working in the `tidyverse` veracular.  First we build a data frame of album names and the year of release.  This gets fed into a single function `genius::add_genius` which returns all the lyrics.  I'm embarressed to think about the tangle mess of web scraping code I was previously using.
 
@@ -44,6 +49,7 @@ As usual, we check to see if the file with all the downloaded data is already av
 #make sure you have a Genius API token
 # my token is in the .Reviron file
 
+# All the studio albums
 ramones_albums <- tribble(
   ~album, ~year,
   "Ramones", 1976,
@@ -73,18 +79,27 @@ if (file.exists("data/ramones_lyrics_genius.rdata")){
   save(ramones_lyrics_genius,file="data/ramones_lyrics_genius.rdata")
 }
 
+
 ```
+
+## Put Lyics in Tidytext Form
 Most projects require a huge amount of data wrangling before we can get any real analysis done.  This project is pretty clean.  We are already nearly good to go.  Further, `tidytext` makes the remaining manipulation of the data soooo easy!  To wit, let's tokenize the data into individual words.
 ```{r}
 #lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(word,lyrics)
 ramones_lyrics <- ramones_lyrics_genius
+#make factor to keep albums in order of issue date
+ramones_lyrics$album <- as_factor(ramones_lyrics$album)
+ramones_albums$album <- as_factor(ramones_albums$album)
+ramones_lyrics <- right_join(ramones_lyrics,ramones_albums,by="album")
 lyric_words <- ramones_lyrics  %>% 
   unnest_tokens(word,lyric) %>%
   rename(song_name=track_title)
 ```
-That's it!  Before we look at the what the Ramones want we might as well run the, now routine, sentiment analysis you may have learned about from Julia Silge and David Robinson [here](https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html).  The Ramones are no Jane Austen but, hey, they have feelings, ya know?
 
-To start our sentiment analysis let's pull out stop words that don't provide much context.
+## Do Some Sentiment Analysis
+That was easy!  Before we look at the what the Ramones want we might as well run the, now routine, sentiment analysis you may have learned about from Julia Silge and David Robinson [here](https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html).  The Ramones are no Jane Austen but, hey, they have feelings, ya know?
+
+To start our sentiment analysis let's pull out stop words that don't provide much context and label all the words in the "bing" sentiment database as either positive or negative.
 ```{r}
 lyric_words_cleaned <- lyric_words %>% anti_join(get_stopwords(),by="word")
 
@@ -115,6 +130,7 @@ lyric_words_cleaned %>%
 
 ```
 
+Now we change the sign of the count of negative words so we can get the net balance of happy vs. sad words.
 ```{r}
 lyric_words_cleaned %>%
   inner_join(get_sentiments("bing"),by="word") %>%
@@ -130,59 +146,74 @@ lyric_words_cleaned %>%
   geom_col() +
   coord_flip() +
   labs(title="How Happy are RAMONES Songs?",
-       y = "Balance of Postive to Negative Words",
+       y = "Very Sad <---   ---> Very Happy",
        x= "") +
   scale_fill_manual(values = c("red","darkgrey"))+
   theme(axis.text.y =  element_text(size=7,hjust=1)) 
-```
-
-What is overall sentiment?
-"Sentiment" is a funny thing.  We can guess at the sentiment of words without context but we can't be sure.  Certainly "punk" is not a negative word in the world of the Ramones so we should probably filter that out.
-```{r}
-lyric_words_cleaned %>%
-  filter(word != "punk") %>% 
-  inner_join(get_sentiments("bing"),by="word") %>%
-  count(sentiment,sort=TRUE) %>% 
-  ggplot(aes(sentiment, n, fill = sentiment)) +
-  geom_col() +
-  labs(title="How Happy are the RAMONES?",
-       y = "Word Count (excluding 'Punk')",
-       x= "") +
-  scale_fill_manual(values = c("red","darkgrey"))+
-  theme(axis.text.y =  element_text(size=7,hjust=1)) 
-
-```
-```{r}
-{par(bg="black")
-lyric_words_cleaned %>%
-  inner_join(get_sentiments("bing"),by="word") %>%
-  count(word, sentiment, sort = TRUE) %>%
-  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-#  comparison.cloud(colors = c("#F8766D", "#00BFC4"),
-#                   max.words = 100)
-  comparison.cloud(colors = c("red", "grey60"),
-                   max.words = 100,
-                   title.bg.colors="grey60")
-}
 ```
 
 ## Sentiment Over Time
-```{r}
-lyric_words_cleaned %>%
-  filter(word != "punk") %>% 
-  inner_join(get_sentiments("bing"),by="word") %>%
-  count(sentiment,sort=TRUE) %>% 
-  ggplot(aes(sentiment, n, fill = sentiment)) +
-  geom_col() +
-  labs(title="How Happy are the RAMONES?",
-       y = "Word Count (excluding 'Punk')",
-       x= "") +
-  scale_fill_manual(values = c("red","darkgrey"))+
-  theme(axis.text.y =  element_text(size=7,hjust=1)) 
+The average sentiment over the whole lyric corpus is about evenly split between positive and negative words but 
+if we look at sentiment by album we see a gyrating trend with an intersting dip in their middle years.
 
+```{r}
+
+lyric_words_cleaned %>%
+  inner_join(get_sentiments("bing"),by="word") %>%
+  group_by(album, year) %>% 
+  count(sentiment,sort=TRUE) %>% 
+  arrange(album) %>% 
+  pivot_wider(values_from = n,names_from = sentiment) %>% 
+  mutate(fraction_happy = positive/(negative+positive)) %>%
+  ggplot(aes(year,fraction_happy)) + geom_line(color="red") + geom_point(color="red") +
+  labs(title = "RAMONES Mood Over Time",
+       y= "Fraction of Happy Words",
+       x= "Album Release Year") + 
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    geom_text_repel(aes(label=album),
+                    color="white",
+                    segment.color = "white")
 ```
 
+We can generate word clouds for any album. Their "happiest" album is "Road to Ruin."
+```{r}
+{par(bg="black")
+  lyric_words_cleaned %>%
+    filter(album == "Road To Ruin") %>% 
+    inner_join(get_sentiments("bing"),by="word") %>%
+    count(word, sentiment, sort = TRUE) %>%
+    acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+    #  comparison.cloud(colors = c("#F8766D", "#00BFC4"),
+    #                   max.words = 100)
+    comparison.cloud(colors = c("red", "grey60"),
+                     max.words = 100,
+                     title.bg.colors="grey60")
+    text(x=1.1,y=0.5,"RAMONES",col="red",cex=4,srt=270)
+    text(x=-0.1,y=0.5,"Road To Ruin",col="grey60",cex=4,srt=90)
+}
+```
+... and their angriest, "Animal Boy."  You start to think there is something to this sentiment analysis stuff when you read the opening of this album's review at <http://allmusic.com>:
 
+> Animal Boy wasn't a very happy record for the Ramones. Since the release of Too Tough to Die (a slight return to form) nearly two years earlier, the band's fortunes had gone from bad to worse; interest in the band kept dwindling with every release and the "bruthas" were constantly at each other's throat. 
+
+```{r}
+{par(bg="black")
+  lyric_words_cleaned %>%
+    filter(album == "Animal Boy") %>% 
+    inner_join(get_sentiments("bing"),by="word") %>%
+    count(word, sentiment, sort = TRUE) %>%
+    acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+    #  comparison.cloud(colors = c("#F8766D", "#00BFC4"),
+    #                   max.words = 100)
+    comparison.cloud(colors = c("red", "grey60"),
+                     max.words = 100,
+                     title.bg.colors="grey60")
+    text(x=1.1,y=0.5,"RAMONES",col="red",cex=4,srt=270)
+    text(x=-0.1,y=0.5,"Animal Boy",col="grey60",cex=4,srt=90)
+}
+```
+
+## What do the RAMONES want and not want?
 
 Now lets find what the Ramones Want.  An n-gram is simply a cluster of words of length n.  Let's look at the most common n-grams, which would include the phrases like "I want" and "I wanna."
 
@@ -193,7 +224,6 @@ want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i 
 get_ngrams <- function(lyrics,n,prefixes=""){
   min_instance = 0
   lyric_ngram <- lyrics %>% 
-#    select(-band,-lyric_url) %>% 
     unnest_tokens(ngram,lyric,token = "ngrams",n=n) %>% 
     group_by(ngram) %>% 
     filter(str_detect(ngram,prefixes)) %>% 
@@ -210,11 +240,12 @@ want <- ramones_lyrics %>% get_ngrams(5,want_phrases)
 want
 ```
 
-What a human needs to do is decide which phrases are complete thoughts.  We manually select the row numbers to build our ultimate table and build a longer n-gram table to flesh out those that are not.
+What a human needs to do is decide which phrases are complete thoughts.  We manually select the row numbers to build our ultimate table.
 
-Remember what I said before about data wrangling?  Well, getting the words was easy.  Determining meaningful phrases is not.  If this was Spotify, our AI could figure these out, but it is not Spotify. This is a manual,iterative process of taking ever-longer n-grams until we don't see any sensible new phrases.  I won't bore you with every iteration so let's skip ahead.
+Remember what I said before about data wrangling?  Well, sure, getting the words was easy.  Determining meaningful phrases not (for a computer).  If this was Spotify, our AI could figure these out, but this is not Spotify. This is an iterative process of manually inspecting tables of ever-longer n-grams and noting which rows have complete thoughts until we don't see any sensible new phrases.  We run through twice, first for "want" then "don't want." We flip the sign on the count of "don't wants" to negativeI won't bore you with every iteration so let's skip ahead.  Think of this as the cinematic training montage.
 
 ```{r}
+# WANT
 # make "wanna" in to "want to" which also frequently appears so we get a good count.
 ramones_lyrics <- ramones_lyrics %>% mutate(lyric=str_replace_all(lyric,"wanna","want to"))
 do_want <- tibble()
@@ -235,10 +266,8 @@ build_wants <- function(all_wants) {
   want <- ramones_lyrics %>% get_ngrams(6,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(1,11,12,22,25,28),])
   want <- ramones_lyrics %>% get_ngrams(7,want_phrases)
-  #want
   all_wants <- bind_rows(all_wants,want[c(5,6,7,9,10,12,21),])
   want <- ramones_lyrics %>% get_ngrams(8,want_phrases)
-  #want
   all_wants <- bind_rows(all_wants,want[c(7,3),])
   return (all_wants)
 }
@@ -250,62 +279,50 @@ do_want <- do_want %>%
   summarise(n=sum(n)) %>% 
   arrange(desc(n))
 
-do_want %>% mutate(want=reorder(want,n)) %>% 
-  ggplot(aes(want,n)) + geom_col(fill="darkgrey")+coord_flip() +
-  theme(axis.text.y = element_text(hjust=1,size=10))+ 
-  scale_fill_manual(values = c("darkgrey"))
-
-```
-What DON'T the Ramones want? Once again, we go through the same iterative process with different phrase stems.
-```{r}
+# DONT'T WANT
 dont_want <- tibble()
 all_wants <- tibble() # for debugging only
 ramones_lyrics <- ramones_lyrics %>% mutate(lyric=str_replace_all(lyric,"wanna","want to"))
 want_phrases <- "^(i don't want |we don't want |i didn't want )"
 build_dont_wants <- function(all_wants) {
-  want <- ramones_lyrics %>% get_ngrams(4,want_phrases) %>% mutate(n = -n)
+  want <- ramones_lyrics %>% get_ngrams(4,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(2),])
-#  want
-  want <- ramones_lyrics %>% get_ngrams(5,want_phrases) %>% mutate(n = -n)
-  #want
+  want <- ramones_lyrics %>% get_ngrams(5,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(3,5,6,7,9,11,15),])
-  want <- ramones_lyrics %>% get_ngrams(6,want_phrases) %>% mutate(n = -n)
-  #want
+  want <- ramones_lyrics %>% get_ngrams(6,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(1,7),])
-  want <- ramones_lyrics %>% get_ngrams(7,want_phrases) %>% mutate(n = -n)
-#  want
+  want <- ramones_lyrics %>% get_ngrams(7,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(2,17),])
-  want <- ramones_lyrics %>% get_ngrams(8,want_phrases) %>% mutate(n = -n)
+  want <- ramones_lyrics %>% get_ngrams(8,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(7,8,9,16),])
-  want <- ramones_lyrics %>% get_ngrams(9,want_phrases) %>% mutate(n = -n)
-#  want
+  want <- ramones_lyrics %>% get_ngrams(9,want_phrases)
   all_wants <- bind_rows(all_wants,want[c(3,10,12),])
-  want <- ramones_lyrics %>% get_ngrams(10,want_phrases) %>% mutate(n = -n)
-#  want
+  want <- ramones_lyrics %>% get_ngrams(10,want_phrases)
   #there it is - Pet Sematary!
   all_wants <- bind_rows(all_wants,want[c(1),])
 }
 dont_want <- build_dont_wants(dont_want)
 dont_want <- dont_want %>%
+  mutate(n = -n) %>% 
   mutate(want=str_to_title(want)) %>% 
   group_by(want) %>%
   summarise(n=sum(n)) %>% 
   arrange(n)
-dont_want
 ```
 
-Finally we put it all together in a somewhat cramped plot.
+Finally we put it all together to get what we're after.
 
 ```{r}
 ultimate_want <- bind_rows(do_want,dont_want) %>% 
   group_by(want) %>%
   summarise(n=sum(n)) %>%   
-  mutate(sentiment = ifelse(n > 0,"want","don't want")) %>% 
+  mutate(Sentiment = ifelse(n > 0,"Want","Don't Want")) %>% 
   arrange(n) %>% 
   {.}
 
 p <- ultimate_want %>% mutate(want=reorder(want,n)) %>% 
-  ggplot(aes(want,n,fill=sentiment)) + geom_col()+coord_flip()+
+  filter(abs(n) > 1) %>% 
+  ggplot(aes(want,n,fill=Sentiment)) + geom_col()+coord_flip()+
   labs(title="What Do The RAMONES Want?",
        y="How Much Do The RAMONES Want It?",
        x="")
@@ -318,7 +335,7 @@ Sometimes, late at night, after everyone else is asleep, I hide under the covers
 
 ```{r}
 collapsed_want <- ultimate_want %>%
-  filter(sentiment=="want") %>%
+  filter(Sentiment=="Want") %>%
   mutate(want = ifelse(n<4,"Other",want)) %>%
   group_by(want) %>% 
   summarise(n=sum(n)) %>% 
@@ -337,7 +354,7 @@ collapsed_want <- ultimate_want %>%
 
 ```{r}
 collapsed_want <- ultimate_want %>%
-  filter(sentiment=="don't want") %>%
+  filter(Sentiment=="Don't Want") %>%
   mutate(n = -n) %>% 
   mutate(want = ifelse(n<2,"Other",want)) %>%
   group_by(want) %>% 
