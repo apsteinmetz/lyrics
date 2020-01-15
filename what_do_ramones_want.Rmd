@@ -1,9 +1,9 @@
 ---
 title: "What Do the Ramones Want?"
 output:
+  html_notebook: default
   html_document:
     df_print: paged
-  html_notebook: default
 ---
 Recently I saw a tweet that shared this hilarious poster.
 ![](img/Wants4thEdition.jpg)
@@ -42,9 +42,9 @@ ggthemr("earth",type="outer")
 
 Have you ever spent an enormous amount of time on something, only to discover there was a much simpler way?  Yes, yes you have. For this project we need a source of Ramones lyrics.  Originally, I built a very finicky web scraping routine to get lyrics from a site I commonly use in my browser.  I coaxed it to get all of the lyrics but I didn't want to share it in this post because you would likely not be able to get it to work smoothly.  Months passed then it occurred to me to Google "lyrics api" and, "viola!", I found <http://genius.com> and the genius R package by Josiah Parry, available on CRAN.  Access to the lyric API does require a free application access token. You can [generate one here](https://docs.genius.com/#/getting-started-h1).  I will leave installing the token called GENIUS_API_TOKEN into your R environment as an exercise for the reader.  There are numerous tutorials on this subject around.
 
-As always, we will be working in the `tidyverse` veracular.  First we build a data frame of album names and the year of release.  This gets fed into a single function `genius::add_genius` which returns all the lyrics.  I'm embarressed to think about the tangle mess of web scraping code I was previously using.
+As always, we will be working in the `tidyverse` veracular.  First we build a data frame of album names and the year of release.  This gets fed into a single function `genius::add_genius` which returns all the lyrics.  I'm embarressed to think about the tangled mess of web scraping code I was previously using.
 
-As usual, we check to see if the file with all the downloaded data is already available so we can quickly iterate on features of our project.
+As usual, we check to see if the file with all the downloaded data is already available so, as we iterate versions of our project, we don't hit the API over and over.
 ```{r get lyrics}
 #make sure you have a Genius API token
 # my token is in the .Reviron file
@@ -85,7 +85,6 @@ if (file.exists("data/ramones_lyrics_genius.rdata")){
 ## Put Lyics in Tidytext Form
 Most projects require a huge amount of data wrangling before we can get any real analysis done.  This project is pretty clean.  We are already nearly good to go.  Further, `tidytext` makes the remaining manipulation of the data soooo easy!  To wit, let's tokenize the data into individual words.
 ```{r}
-#lyric_words <- ramones_lyrics %>% select(-band,-lyric_url) %>% unnest_tokens(word,lyrics)
 ramones_lyrics <- ramones_lyrics_genius
 #make factor to keep albums in order of issue date
 ramones_lyrics$album <- as_factor(ramones_lyrics$album)
@@ -116,9 +115,7 @@ lyric_words_cleaned %>%
   count(word) %>% 
   group_by(song_name) %>% 
   tally(sort = TRUE,name="Happy Words")
-  
 ```
-
 ```{r}
 lyric_words_cleaned %>%
   semi_join(negative,by="word") %>%
@@ -126,10 +123,7 @@ lyric_words_cleaned %>%
   count(word) %>% 
   group_by(song_name) %>% 
   tally(sort = TRUE,name="Sad Words")
-  
-
 ```
-
 Now we change the sign of the count of negative words so we can get the net balance of happy vs. sad words.
 ```{r}
 lyric_words_cleaned %>%
@@ -192,6 +186,7 @@ We can generate word clouds for any album. Their "happiest" album is "Road to Ru
     text(x=-0.1,y=0.5,"Road To Ruin",col="grey60",cex=4,srt=90)
 }
 ```
+
 ... and their angriest, "Animal Boy."  You start to think there is something to this sentiment analysis stuff when you read the opening of this album's review at <http://allmusic.com>:
 
 > Animal Boy wasn't a very happy record for the Ramones. Since the release of Too Tough to Die (a slight return to form) nearly two years earlier, the band's fortunes had gone from bad to worse; interest in the band kept dwindling with every release and the "bruthas" were constantly at each other's throat. 
@@ -213,7 +208,7 @@ We can generate word clouds for any album. Their "happiest" album is "Road to Ru
 }
 ```
 
-## What do the RAMONES want and not want?
+## What do the RAMONES want... and not want?
 
 Now lets find what the Ramones Want.  An n-gram is simply a cluster of words of length n.  Let's look at the most common n-grams, which would include the phrases like "I want" and "I wanna."
 
@@ -242,7 +237,7 @@ want
 
 What a human needs to do is decide which phrases are complete thoughts.  We manually select the row numbers to build our ultimate table.
 
-Remember what I said before about data wrangling?  Well, sure, getting the words was easy.  Determining meaningful phrases not (for a computer).  If this was Spotify, our AI could figure these out, but this is not Spotify. This is an iterative process of manually inspecting tables of ever-longer n-grams and noting which rows have complete thoughts until we don't see any sensible new phrases.  We run through twice, first for "want" then "don't want." We flip the sign on the count of "don't wants" to negativeI won't bore you with every iteration so let's skip ahead.  Think of this as the cinematic training montage.
+Remember what I said before about data wrangling?  Well, sure, getting the words was easy.  Determining meaningful phrases not (for a computer).  If this was Spotify, our AI could figure these out, but this is not Spotify. This is an iterative process of manually inspecting tables of ever-longer n-grams and noting which rows have complete thoughts until we don't see any sensible new phrases.  We run through twice, first for "want" then "don't want." We flip the sign on the count of "don't wants" to negative.  I won't bore you with every iteration so let's skip ahead.  Think of this as the cinematic training montage.
 
 ```{r}
 # WANT
@@ -331,7 +326,9 @@ p +
   theme(axis.text.y =  element_text(size=7,hjust=1)) 
 ```
 
-Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts. Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle (ahem) let's make a version of Grayhood's poster with our data.  So it's not a complete mess we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" which the poster above includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
+## Bringing It Full Circle
+
+Sometimes, late at night, after everyone else is asleep, I hide under the covers, open my laptop and look at... pie charts. Ed Tufte says I will go blind if I keep doing it.  Still, for the sake of bringing this full circle (ahem) back to the chart that inspired it, let's make a version of Grayhood's poster with our data.  So it's not a complete mess, we lump any phrases that occur less than 4 times in "Other."  That takes some of the fun out of things since we lose memorable phrases like "I wanna sniff some glue" which the poster above includes.  This is data science, not art.  It's not supposed to be fun! While I use ggplot2 pretty much exclusively, the base R `pie` plot produces pretty clean results that approximate the style of the poster with no embellishment. 
 
 ```{r}
 collapsed_want <- ultimate_want %>%
