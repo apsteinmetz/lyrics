@@ -94,9 +94,23 @@ lyric_words <- ramones_lyrics  %>%
   unnest_tokens(word,lyric) %>%
   rename(song_name=track_title)
 ```
+See, I said it was easy.
+
+## How Needy Are The Ramones?
+
+Out of 193 songs on all their studio albums, 16 mention wanting or not wanting in the title.  "I Wanna" songs are a thing with the Ramones.
+```{r}
+want_phrases <- "Wanna|Want"
+ramones_lyrics %>% 
+  select(album, track_title) %>% 
+  distinct() %>%
+  filter(str_detect(track_title,want_phrases)) %>% 
+  {.}
+```
 
 ## Do Some Sentiment Analysis
-That was easy!  Before we look at the what the Ramones want we might as well run the, now routine, sentiment analysis you may have learned about from Julia Silge and David Robinson [here](https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html).  The Ramones are no Jane Austen but, hey, they have feelings, ya know?
+
+Before we look at the what the Ramones want we might as well run the, now routine, sentiment analysis you may have learned about from Julia Silge and David Robinson [here](https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html).  The Ramones are no Jane Austen but, hey, they have feelings, ya know?  SAD NOTE: They "had" feelings.  All the original four are dead.
 
 To start our sentiment analysis let's pull out stop words that don't provide much context and label all the words in the "bing" sentiment database as either positive or negative.
 ```{r}
@@ -252,6 +266,8 @@ build_wants <- function(all_wants) {
   want_phrases <- "^(i wanna |i want |we want |we wanna |i wanted |i just want |i just wanna )"
   #select the 3-gram phrases that are complete thoughts using manual inspection
   want <- ramones_lyrics %>% get_ngrams(3,want_phrases)
+  # visually inspect the want variable and select which lines to add to all_wants
+  # pause after each instance of get_ngrams to do this.
   all_wants <- bind_rows(all_wants,want[c(2,8,11,13),])
   # move to the 4-gram phrases, etc
   want <- ramones_lyrics %>% get_ngrams(4,want_phrases)
